@@ -43,12 +43,51 @@ export CUDA_VISIBLE_DEVICES=0,1,2,3
 export UCX_WARN_UNUSED_ENV_VARS=n
 rm -rf /home/r250119-u15/lc/result/run4_pro
 
+# ==================== 【性能分析配置】 ====================
+# 性能分析输出目录
+PROFILE_DIR=/home/r250119-u15/lc/profile_output
+mkdir -p $PROFILE_DIR
+
+# 性能分析文件名（带时间戳避免覆盖）
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+PROFILE_NAME=hemepure_profile_${TIMESTAMP}
+
 # ==================== 【最终运行命令】 ====================
-mpirun -np 16 \
---bind-to numa \
---mca mpi_preconnect_mpi 1 \
---mca mpi_cuda_support 1 \
-/home/r250119-u15/lc/HemePure-GPU/src/build_PP_Benchmark/hemepure_gpu \
--in /home/r250119-u15/lc/Aneurysm-VIRTUAL/input_PP.xml \
--out /home/r250119-u15/lc/result/run4_pro
+# 使用 nsys 进行性能分析
+# 追踪: CUDA API, NVTX(用于代码标注), OSRT(系统运行时), MPI
+# GPU指标: 收集所有GPU的指标
+nsys profile \
+  -o $PROFILE_DIR/$PROFILE_NAME \
+  --trace=cuda,nvtx,osrt,mpi \
+  --gpu-metrics-device=all \
+  --sample=cpu \
+  --cpu-arch-arm=yes \
+  --force-overwrite true \
+  --wait=all \
+  --stop-on-range-end=true \
+  mpirun -np 16 \
+  --bind-to numa \
+  --mca mpi_preconnect_mpi 1 \
+  --mca mpi_cuda_support 1 \
+  /home/r250119-u15/lc/HemePure-GPU/src/build_PP_Benchmark/hemepure_gpu \
+  -in /home/r250119-u15/lc/Aneurysm-VIRTUAL/input_PP.xml \
+  -out /home/r250119-u15/lc/result/run4_pro
+
+echo "性能分析完成！"
+echo "输出文件: $PROFILE_DIR/${PROFILE_NAME}.qdrep"
+echo ""
+echo "===== 分析报告 ====="
+echo "请运行以下命令查看性能报告:"
+echo ""
+echo "1. 命令行统计 (推荐先运行这个):"
+echo "   nsys stats $PROFILE_DIR/${PROFILE_NAME}.qdrep"
+echo ""
+echo "2. 或使用 NVIDIA Nsight Systems GUI 打开:"
+echo "   nsys-ui $PROFILE_DIR/${PROFILE_NAME}.qdrep"
+echo ""
+echo "3. 查看 GPU 利用率详情:"
+echo "   nsys stats $PROFILE_DIR/${PROFILE_NAME}.qdrep --report gputrace"
+echo ""
+echo "4. 查看 MPI 通信统计:"
+echo "   nsys stats $PROFILE_DIR/${PROFILE_NAME}.qdrep --report mpitrace"
 
