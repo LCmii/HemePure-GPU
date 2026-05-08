@@ -205,7 +205,7 @@ namespace hemelb
     template<class BroadcastPolicy>
     void IncompressibilityChecker<BroadcastPolicy>::ProgressFromChildren(unsigned long splayNumber)
     {
-      this->ReceiveFromChildren(childrenDensitiesSerialised, DensityTracker::DENSITY_TRACKER_SIZE);
+      this->ReceiveFromChildren(childrenDensitiesSerialised.data(), DensityTracker::DENSITY_TRACKER_SIZE);
     }
 
     template<class BroadcastPolicy>
