@@ -12,7 +12,6 @@
 #include "lb/HFunction.h"
 #include "log/Logger.h"
 #include <vector>
-#include <cmath>
 
 namespace hemelb
 {
@@ -24,12 +23,7 @@ namespace hemelb
       private:
         static unsigned int ComputeSpreadFactor(int commSize)
         {
-          if (commSize <= 1)
-            return 1;
-          unsigned int maxDepth = 4;
-          unsigned int sf = (unsigned int)std::ceil(std::pow((double)commSize, 1.0 / maxDepth));
-          if (sf < 2) sf = 2;
-          return sf;
+          return commSize;
         }
 
       public:
