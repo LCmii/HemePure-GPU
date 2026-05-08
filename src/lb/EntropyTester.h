@@ -137,7 +137,7 @@ namespace hemelb
          */
         void ProgressFromChildren(unsigned long splayNumber)
         {
-          ReceiveFromChildren<int>(mChildrensValues, 1);
+          ReceiveFromChildren<int>(mChildrensValues.data(), 1);
         }
 
         void ProgressToParent(unsigned long splayNumber)

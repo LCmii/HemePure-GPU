@@ -88,7 +88,7 @@ template<class LatticeType>
          */
         void ProgressFromChildren(unsigned long splayNumber)
         {
-          ReceiveFromChildren<int>(mChildrensStability, 1);
+          ReceiveFromChildren<int>(mChildrensStability.data(), 1);
         }
 
         void ProgressFromParent(unsigned long splayNumber)
