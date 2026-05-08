@@ -12,6 +12,8 @@
 #include "net/PhasedBroadcastRegular.h"
 #include "reporting/Reportable.h"
 #include <cfloat>
+#include <vector>
+#include <cmath>
 
 namespace hemelb
 {
@@ -24,13 +26,24 @@ namespace hemelb
      */
     static const distribn_t REFERENCE_DENSITY = 1.0;
 
-    template<class BroadcastPolicy>
+template<class BroadcastPolicy>
     class IncompressibilityChecker : public BroadcastPolicy,
-                                     public reporting::Reportable
+                                      public reporting::Reportable
     {
         /**
          * This class uses the phased broadcast infrastructure to keep track of the maximum density difference across the domain.
          */
+
+      private:
+        static unsigned int ComputeSpreadFactor(int commSize)
+        {
+          if (commSize <= 1)
+            return 1;
+          unsigned int maxDepth = 4;
+          unsigned int sf = (unsigned int)std::ceil(std::pow((double)commSize, 1.0 / maxDepth));
+          if (sf < 2) sf = 2;
+          return sf;
+        }
 
       public:
         class DensityTracker
@@ -221,11 +234,9 @@ namespace hemelb
       private:
 
         /**
-         * Slightly arbitrary spread factor for the tree.
-         *
-         * @todo #23 This is defined in StabilityChecker as well, refactor somewhere else?
+         * Dynamically computed spread factor for the tree.
          */
-        static const unsigned int SPREADFACTOR = 10u;
+        unsigned int mSpreadFactor;
 
         /** Pointer to lattice data object. */
         const geometry::LatticeData * mLatDat;
@@ -252,7 +263,7 @@ namespace hemelb
         DensityTracker downwardsDensityTracker;
 
         /** Array for storing the passed-up densities from child nodes. */
-        distribn_t childrenDensitiesSerialised[SPREADFACTOR * DensityTracker::DENSITY_TRACKER_SIZE];
+        std::vector<distribn_t> childrenDensitiesSerialised;
     };
 
   }

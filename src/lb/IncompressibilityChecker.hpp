@@ -103,13 +103,18 @@ namespace hemelb
                                                                         lb::MacroscopicPropertyCache& propertyCache,
                                                                         reporting::Timers& timings,
                                                                         distribn_t maximumRelativeDensityDifferenceAllowed) :
-        BroadcastPolicy(net, simState, SPREADFACTOR), mLatDat(latticeData), propertyCache(propertyCache), mSimState(simState), timings(timings), maximumRelativeDensityDifferenceAllowed(maximumRelativeDensityDifferenceAllowed), globalDensityTracker(NULL)
+        BroadcastPolicy(net, simState, ComputeSpreadFactor(net->GetCommunicator().Size())),
+        mLatDat(latticeData), propertyCache(propertyCache), mSimState(simState), timings(timings),
+        maximumRelativeDensityDifferenceAllowed(maximumRelativeDensityDifferenceAllowed),
+        globalDensityTracker(NULL),
+        mSpreadFactor(ComputeSpreadFactor(net->GetCommunicator().Size())),
+        childrenDensitiesSerialised(ComputeSpreadFactor(net->GetCommunicator().Size()) * DensityTracker::DENSITY_TRACKER_SIZE)
     {
       /*
        *  childrenDensitiesSerialised must be initialised to something sensible since ReceiveFromChildren won't
        *  fill it in completely unless the logarithm base SPREADFACTOR of the number of processes is an integer.
        */
-      for (unsigned leaf_index = 0; leaf_index < SPREADFACTOR; leaf_index++)
+      for (unsigned leaf_index = 0; leaf_index < mSpreadFactor; leaf_index++)
       {
         unsigned offset = leaf_index * DensityTracker::DENSITY_TRACKER_SIZE;
         for (unsigned tracker_index = 0; tracker_index < DensityTracker::DENSITY_TRACKER_SIZE; tracker_index++)
@@ -173,7 +178,7 @@ namespace hemelb
     {
       timings[hemelb::reporting::Timers::monitoring].Start();
 
-      for (int childIndex = 0; childIndex < (int) SPREADFACTOR; childIndex++)
+      for (unsigned childIndex = 0; childIndex < mSpreadFactor; childIndex++)
       {
         DensityTracker childDensities(&childrenDensitiesSerialised[childIndex * DensityTracker::DENSITY_TRACKER_SIZE]);
 

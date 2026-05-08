@@ -17,6 +17,9 @@
 #endif
 // IZ
 
+#include <vector>
+#include <cmath>
+
 
 namespace hemelb
 {
@@ -35,15 +38,28 @@ namespace hemelb
      * the tree to compose the local stability for all nodes to discover whether the simulation as
      * a whole is stable.
      */
-    template<class LatticeType>
+template<class LatticeType>
     class StabilityTester : public net::PhasedBroadcastRegular<>
     {
+      private:
+        static unsigned int ComputeSpreadFactor(int commSize)
+        {
+          if (commSize <= 1)
+            return 1;
+          unsigned int maxDepth = 4;
+          unsigned int sf = (unsigned int)std::ceil(std::pow((double)commSize, 1.0 / maxDepth));
+          if (sf < 2) sf = 2;
+          return sf;
+        }
+
       public:
         StabilityTester(const geometry::LatticeData * iLatDat, net::Net* net,
-                        SimulationState* simState, reporting::Timers& timings,
+                        SimulationState* simState, reporting::Timers& timing,
                         const hemelb::configuration::SimConfig::MonitoringConfig* testerConfig) :
-            net::PhasedBroadcastRegular<>(net, simState, SPREADFACTOR), mLatDat(iLatDat),
-                mSimState(simState), timings(timings), testerConfig(testerConfig)
+            net::PhasedBroadcastRegular<>(net, simState, ComputeSpreadFactor(net->GetCommunicator().Size())),
+            mLatDat(iLatDat),
+            mSimState(simState), timings(timing), testerConfig(testerConfig),
+            mChildrensStability(ComputeSpreadFactor(net->GetCommunicator().Size()), UndefinedStability)
         {
           Reset();
         }
@@ -58,7 +74,7 @@ namespace hemelb
 
           mSimState->SetStability(UndefinedStability);
 
-          for (unsigned int ii = 0; ii < SPREADFACTOR; ii++)
+          for (unsigned int ii = 0; ii < mChildrensStability.size(); ii++)
           {
             mChildrensStability[ii] = UndefinedStability;
           }
@@ -332,7 +348,7 @@ namespace hemelb
           // No need to test children's stability if this node is already unstable.
           if (mUpwardsStability != Unstable)
           {
-            for (int ii = 0; ii < (int) SPREADFACTOR; ii++)
+            for (unsigned int ii = 0; ii < mChildrensStability.size(); ii++)
             {
               if (mChildrensStability[ii] == Unstable)
               {
@@ -348,7 +364,7 @@ namespace hemelb
               bool anyConverged = false;
 
               // mChildrensStability will contain UndefinedStability for non-existent children
-              for (int ii = 0; ii < (int) SPREADFACTOR; ii++)
+              for (unsigned int ii = 0; ii < mChildrensStability.size(); ii++)
               {
                 if (mChildrensStability[ii] == StableAndConverged)
                 {
@@ -389,11 +405,6 @@ namespace hemelb
         }
 
       private:
-        /**
-         * Slightly arbitrary spread factor for the tree.
-         */
-        static const unsigned int SPREADFACTOR = 10;
-
         const geometry::LatticeData * mLatDat;
 
         /**
@@ -407,7 +418,7 @@ namespace hemelb
         /**
          * Array for storing the passed-up stability values from child nodes.
          */
-        int mChildrensStability[SPREADFACTOR];
+        std::vector<int> mChildrensStability;
         /**
          * Pointer to the simulation state used in the rest of the simulation.
          */

@@ -11,6 +11,8 @@
 #include "geometry/LatticeData.h"
 #include "lb/HFunction.h"
 #include "log/Logger.h"
+#include <vector>
+#include <cmath>
 
 namespace hemelb
 {
@@ -19,13 +21,26 @@ namespace hemelb
     template<class LatticeType>
     class EntropyTester : public net::PhasedBroadcastRegular<false, 1, 1, false, true>
     {
+      private:
+        static unsigned int ComputeSpreadFactor(int commSize)
+        {
+          if (commSize <= 1)
+            return 1;
+          unsigned int maxDepth = 4;
+          unsigned int sf = (unsigned int)std::ceil(std::pow((double)commSize, 1.0 / maxDepth));
+          if (sf < 2) sf = 2;
+          return sf;
+        }
+
       public:
         EntropyTester(int* collisionTypes,
                       unsigned int typesTested,
                       const geometry::LatticeData * iLatDat,
                       net::Net* net,
                       SimulationState* simState) :
-            net::PhasedBroadcastRegular<false, 1, 1, false, true>(net, simState, SPREADFACTOR), mLatDat(iLatDat)
+            net::PhasedBroadcastRegular<false, 1, 1, false, true>(net, simState, ComputeSpreadFactor(net->GetCommunicator().Size())),
+            mLatDat(iLatDat),
+            mChildrensValues(ComputeSpreadFactor(net->GetCommunicator().Size()), OBEYED)
         {
           for (unsigned int i = 0; i < COLLISION_TYPES; i++)
           {
@@ -109,7 +124,7 @@ namespace hemelb
           // Re-initialise all values to indicate that the H-theorem is obeyed.
           mUpwardsValue = OBEYED;
 
-          for (unsigned int ii = 0; ii < SPREADFACTOR; ii++)
+          for (unsigned int ii = 0; ii < mChildrensValues.size(); ii++)
           {
             mChildrensValues[ii] = OBEYED;
           }
@@ -183,7 +198,7 @@ namespace hemelb
           // No need to test children's entropy direction if this node already disobeys H-theorem.
           if (mUpwardsValue == OBEYED)
           {
-            for (int ii = 0; ii < (int) SPREADFACTOR; ii++)
+            for (unsigned int ii = 0; ii < mChildrensValues.size(); ii++)
             {
               if (mChildrensValues[ii] == DISOBEYED)
               {
@@ -201,11 +216,6 @@ namespace hemelb
           DISOBEYED
         };
 
-        /**
-         * Slightly arbitrary spread factor for the tree.
-         */
-        static const unsigned int SPREADFACTOR = 10;
-
         const geometry::LatticeData * mLatDat;
 
         /**
@@ -215,7 +225,7 @@ namespace hemelb
         /**
          * Array for storing the passed-up stability values from child nodes.
          */
-        int mChildrensValues[SPREADFACTOR];
+        std::vector<int> mChildrensValues;
 
         bool mCollisionTypesTested[COLLISION_TYPES];
         double* mHPreCollision;
